@@ -1,0 +1,19 @@
+
+# Virtual environments
+appenv/
+env/
+ENV/
+
+# Python environment files
+*.env
+*.venv
+*.egg-info/
+*.egg
+*.log
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*$py.class
+
+# VSCode settings
+.idea/
