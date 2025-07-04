@@ -1,5 +1,4 @@
 from typing import Literal, List, Any
-from langchain_core.tools import tool
 from langgraph.types import Command
 from langgraph.graph.message import add_messages
 from typing_extensions import TypedDict, Annotated
@@ -9,11 +8,11 @@ from langgraph.prebuilt import create_react_agent
 from langchain_core.messages import HumanMessage, AIMessage
 from prompts.prompt import system_prompt
 from utils.large_model import GetLLMReturn
-from tools.tools import *
+from tools.tools import latest_news_based_on_query, get_the_stock_price_of_ticker
 
 
 class Router(TypedDict):
-    next: Literal["information_node", "booking_node", "FINISH"]
+    next: Literal["information_node", "ticker_price_node", "FINISH"]
     reasoning: str
 
 
@@ -30,41 +29,21 @@ class FinanceServiceAgent:
         llm_model = GetLLMReturn()
         self.llm_model = llm_model.get_model()
 
-    def supervisor_node(self, state: AgentState) -> Command[Literal['information_node', 'booking_node', '__end__']]:
-        print("**************************below is my state right after entering****************************")
-        print(state)
-
+    def supervisor_node(self, state: AgentState) -> Command[Literal['information_node', 'ticker_price_node', '__end__']]:
         messages = [
                        {"role": "system", "content": system_prompt},
                        {"role": "user", "content": f"user's identification number is {state['id_number']}"},
                    ] + state["messages"]
 
-        print("***********************this is my message*****************************************")
-        print(messages)
-
-        # query = state['messages'][-1].content if state["messages"] else ""
         query = ''
         if len(state['messages']) == 1:
             query = state['messages'][0].content
 
-        print("************below is my query********************")
-        print(query)
-
         response = self.llm_model.with_structured_output(Router).invoke(messages)
-
         goto = response["next"]
-
-        print("********************************this is my goto*************************")
-        print(goto)
-
-        print("********************************")
-        print(response["reasoning"])
 
         if goto == "FINISH":
             goto = END
-
-        print("**************************below is my state****************************")
-        print(state)
 
         if query:
             return Command(goto=goto, update={'next': goto,
@@ -78,10 +57,7 @@ class FinanceServiceAgent:
                        )
 
     def information_node(self, state: AgentState) -> Command[Literal['supervisor']]:
-        print("*****************called information node************")
-
         system_prompt = "You are specialized agent to provide information related to availability of doctors or any FAQs related to hospital based on the query. You have access to the tool.\n Make sure to ask user politely if you need any further information to execute the tool.\n For your information, Always consider current year is 2024."
-
         system_prompt = ChatPromptTemplate.from_messages(
             [
                 (
@@ -95,8 +71,7 @@ class FinanceServiceAgent:
             ]
         )
 
-        information_agent = create_react_agent(model=self.llm_model, tools=[check_availability_by_doctor,
-                                                                            check_availability_by_specialization],
+        information_agent = create_react_agent(model=self.llm_model, tools=[latest_news_based_on_query],
                                                prompt=system_prompt)
 
         result = information_agent.invoke(state)
@@ -111,11 +86,8 @@ class FinanceServiceAgent:
             goto="supervisor",
         )
 
-    def booking_node(self, state: AgentState) -> Command[Literal['supervisor']]:
-        print("*****************called booking node************")
-
+    def ticker_price_node(self, state: AgentState) -> Command[Literal['supervisor']]:
         system_prompt = "You are specialized agent to set, cancel or reschedule appointment based on the query. You have access to the tool.\n Make sure to ask user politely if you need any further information to execute the tool.\n For your information, Always consider current year is 2024."
-
         system_prompt = ChatPromptTemplate.from_messages(
             [
                 (
@@ -129,7 +101,7 @@ class FinanceServiceAgent:
             ]
         )
         booking_agent = create_react_agent(model=self.llm_model,
-                                           tools=[set_appointment, cancel_appointment, reschedule_appointment],
+                                           tools=[get_the_stock_price_of_ticker],
                                            prompt=system_prompt)
 
         result = booking_agent.invoke(state)
@@ -148,7 +120,7 @@ class FinanceServiceAgent:
         self.graph = StateGraph(AgentState)
         self.graph.add_node("supervisor", self.supervisor_node)
         self.graph.add_node("information_node", self.information_node)
-        self.graph.add_node("booking_node", self.booking_node)
+        self.graph.add_node("ticker_node", self.ticker_price_node)
         self.graph.add_edge(START, "supervisor")
         self.app = self.graph.compile()
         return self.app
