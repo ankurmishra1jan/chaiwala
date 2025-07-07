@@ -28,3 +28,7 @@ class IdentificationTickerNumberModel(BaseModel):
         if not re.match(r'^\d{7,8}$', str(v)):
             raise ValueError("The ID number should be a 7 or 8 digit number")
         return v
+
+
+class ToolsdataModel(BaseModel):
+    query: str = Field(description="it should be user query with meaningful to give answer")

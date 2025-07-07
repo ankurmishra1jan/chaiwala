@@ -8,9 +8,12 @@ beautifulsoup4==4.13.4
 certifi==2025.6.15
 cffi==1.17.1
 charset-normalizer==3.4.2
+click==8.2.1
 curl_cffi==0.11.4
 dataclasses-json==0.6.7
+ddgs==9.0.0
 distro==1.9.0
+duckduckgo_search==8.1.1
 fastapi==0.115.14
 filelock==3.18.0
 frozendict==2.4.6
@@ -38,6 +41,7 @@ langgraph-checkpoint==2.1.0
 langgraph-prebuilt==0.5.1
 langgraph-sdk==0.1.72
 langsmith==0.4.4
+lxml==6.0.0
 marshmallow==3.26.1
 multidict==6.6.2
 multitasking==0.0.11
@@ -49,6 +53,7 @@ packaging==24.2
 pandas==2.3.0
 peewee==3.18.1
 platformdirs==4.3.8
+primp==0.15.0
 propcache==0.3.2
 protobuf==6.31.1
 pycparser==2.22
@@ -75,6 +80,7 @@ typing-inspection==0.4.1
 typing_extensions==4.14.0
 tzdata==2025.2
 urllib3==2.5.0
+uvicorn==0.35.0
 websockets==15.0.1
 xxhash==3.5.0
 yarl==1.20.1

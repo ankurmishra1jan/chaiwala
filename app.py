@@ -23,11 +23,11 @@ def execute_agent(user_input: UserQuery):
     app_graph = agent.workflow()
 
     # Prepare agent state as expected by the workflow
-    input = [
+    input_data = [
         HumanMessage(content=user_input.messages)
     ]
     query_data = {
-        "messages": input,
+        "messages": input_data,
         "id_number": user_input.id_number,
         "next": "",
         "query": "",
