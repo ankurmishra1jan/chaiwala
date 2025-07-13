@@ -1,21 +1,35 @@
-import pandas as pd
-from typing import Literal
+from dotenv import load_dotenv
+import os
 from langchain_core.tools import tool
 from langchain_community.tools import DuckDuckGoSearchRun
-from langchain_community.tools.yahoo_finance_news import YahooFinanceNewsTool
+from langchain_community.tools.tavily_search import TavilySearchResults
 import yfinance as yf
 from models.models import ToolsdataModel
+import traceback
+from langchain.globals import set_verbose
+set_verbose(True)
+
+load_dotenv()
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+os.environ["GROQ_API_KEY"] = GROQ_API_KEY
 
 
 @tool
-def latest_news_based_on_query(state: ToolsdataModel)-> str:
+def latest_news_based_on_query(arg)-> str:
     """
-    Based on user query, this will search the data in YahooFinanceNews for get the latest news related stock
-    :param ticker_name:
+    Based on user query, this will search the data in DuckDuckGoSearchRun for get the latest news related
+    :param query:
     :return:
     """
-    search_tool = DuckDuckGoSearchRun()
-    return search_tool.invoke(state['query'])
+    try:
+        # search_tool = DuckDuckGoSearchRun()
+        search_tool = TavilySearchResults()
+        response = search_tool.invoke(arg)
+        print("----------------Tavily Search Result -------------")
+        print(response)
+        return {"messages": response}
+    except Exception:
+        traceback.print_exc()
 
 
 @tool

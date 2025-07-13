@@ -12,12 +12,12 @@ from tools.tools import latest_news_based_on_query, get_the_stock_price_of_ticke
 import traceback
 
 class Router(TypedDict):
-    next: Literal["information_node", "ticker_price_node", "FINISH"]
+    next: Literal["information_node", "FINISH"]
     reasoning: str
 
 
 class AgentState(TypedDict):
-    messages: Annotated[list[Any], add_messages]
+    messages: Annotated[List[Any], add_messages]
     id_number: int
     next: str
     query: str
@@ -29,101 +29,74 @@ class FinanceServiceAgent:
         llm_model = GetLLMReturn()
         self.llm_model = llm_model.get_model()
 
-    def supervisor_node(self, state: AgentState) -> Command[Literal['information_node', 'ticker_price_node', '__end__']]:
-        try:
-            messages = [
-                       {"role": "system", "content": system_prompt},
-                       {"role": "user", "content": f"user's identification number is {state['id_number']}"},
-                   ] + state["messages"]
+    def supervisor_node(self, state: AgentState) -> Command[Literal['information_node', '__end__']]:
+        messages = [
+                   {"role": "system", "content": system_prompt},
+                   {"role": "user", "content": f"user's identification number is {state['id_number']}"},
+               ] + state["messages"]
 
-            query = ''
-            if len(state['messages']) == 1:
-                query = state['messages'][0].content
+        query = ''
+        if len(state['messages']) == 1:
+            query = state['messages'][0].content
 
-            response = self.llm_model.with_structured_output(Router).invoke(messages)
-            goto = response["next"]
+        response = self.llm_model.with_structured_output(Router).invoke(messages)
+        goto = response["next"]
 
-            if goto == "FINISH":
-                goto = END
+        if goto == "FINISH":
+            goto = END
 
-            if query:
-                return Command(goto=goto, update={'next': goto,
-                                                  'query': query,
-                                                  'current_reasoning': response["reasoning"],
-                                                  'messages': [HumanMessage(
-                                                      content=f"user's identification number is {state['id_number']}")]
-                                                  })
+        if query:
             return Command(goto=goto, update={'next': goto,
-                                              'current_reasoning': response["reasoning"]}
-                           )
-        except Exception:
-            traceback.print_exc()
+                                              'query': query,
+                                              'current_reasoning': response["reasoning"],
+                                              'messages': [HumanMessage(
+                                                  content=f"user's identification number is {state['id_number']}")]
+                                              })
+        return Command(goto=goto, update={'next': goto,
+                                          'current_reasoning': response["reasoning"]}
+                       )
 
     def information_node(self, state: AgentState) -> Command[Literal['supervisor']]:
-        system_prompt = "You are specialized agent to provide information related to availability of doctors or any FAQs related to hospital based on the query. You have access to the tool.\n Make sure to ask user politely if you need any further information to execute the tool.\n For your information, Always consider current year is 2024."
-        system_prompt = ChatPromptTemplate.from_messages(
-            [
-                (
-                    "system",
-                    system_prompt
-                ),
-                (
-                    "placeholder",
-                    "{messages}"
-                ),
-            ]
-        )
-
-        information_agent = create_react_agent(model=self.llm_model, tools=[latest_news_based_on_query],
-                                               prompt=system_prompt)
-
-        result = information_agent.invoke(state)
-
-        return Command(
-            update={
-                "messages": state["messages"] + [
-                    AIMessage(content=result["messages"][-1].content, name="information_node")
-                    # HumanMessage(content=result["messages"][-1].content, name="information_node")
+        try:
+            sys_prompt = "You are specialized agent to provide information related based on the user query. You have access to the tool.\n Make sure to ask user politely if you need any further information to execute the tool.\n For your information, Always consider current year is 2024."
+            sys_prompt = ChatPromptTemplate.from_messages(
+                [
+                    (
+                        "system",
+                        sys_prompt
+                    ),
+                    (
+                        "placeholder",
+                        "{messages}"
+                    ),
                 ]
-            },
-            goto="supervisor",
-        )
+            )
 
-    def ticker_price_node(self, state: AgentState) -> Command[Literal['supervisor']]:
-        system_prompt = "You are specialized agent to set, cancel or reschedule appointment based on the query. You have access to the tool.\n Make sure to ask user politely if you need any further information to execute the tool.\n For your information, Always consider current year is 2024."
-        system_prompt = ChatPromptTemplate.from_messages(
-            [
-                (
-                    "system",
-                    system_prompt
-                ),
-                (
-                    "placeholder",
-                    "{messages}"
-                ),
-            ]
-        )
-        booking_agent = create_react_agent(model=self.llm_model,
-                                           tools=[get_the_stock_price_of_ticker],
-                                           prompt=system_prompt)
+            # Trim messages to avoid context overflow
+            MAX_MESSAGES = 6
+            trimmed_state = dict(state)
+            trimmed_state["messages"] = state["messages"][-MAX_MESSAGES:]
 
-        result = booking_agent.invoke(state)
+            information_agent = create_react_agent(model=self.llm_model, tools=[latest_news_based_on_query],
+                                                   prompt=sys_prompt)
 
-        return Command(
-            update={
-                "messages": state["messages"] + [
-                    AIMessage(content=result["messages"][-1].content, name="booking_node")
-                    # HumanMessage(content=result["messages"][-1].content, name="booking_node")
-                ]
-            },
-            goto="supervisor",
-        )
+            result = information_agent.invoke(trimmed_state)
+
+            return Command(
+                update={
+                    "messages": state["messages"] + [
+                        AIMessage(content=result["messages"][-1].content, name="information_node"),
+                    ]
+                },
+                goto="supervisor",
+            )
+        except Exception:
+            traceback.print_exc()
 
     def workflow(self):
         self.graph = StateGraph(AgentState)
         self.graph.add_node("supervisor", self.supervisor_node)
         self.graph.add_node("information_node", self.information_node)
-        self.graph.add_node("ticker_price_node", self.ticker_price_node)
         self.graph.add_edge(START, "supervisor")
         self.app = self.graph.compile()
         return self.app

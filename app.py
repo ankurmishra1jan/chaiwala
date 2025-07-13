@@ -35,5 +35,5 @@ def execute_agent(user_input: UserQuery):
     }
     # config = {"configurable": {"thread_id": "1", "recursion_limit": 100}}
 
-    response = app_graph.invoke(query_data, config={"recursion_limit": 20})
+    response = app_graph.invoke(query_data)
     return {"messages": response["messages"]}
